@@ -68,25 +68,25 @@ router.delete('/users/:userId', userController.deleteUser.bind(userController));
 router.put('/users/client-password/:clientId', userController.adminResetClientPassword.bind(userController));
 
 // --- CLIENTES ---
-router.get('/clientes', clienteController.getAllClients.bind(clienteController));
-router.get('/clientes/:clientId', clienteController.getClientById.bind(clienteController));
-router.delete('/clientes/:clientId', clienteController.deleteClient.bind(clienteController));
-router.put('/clientes/:clientId',
+router.get('/clients', clienteController.getAllClients.bind(clienteController));
+router.get('/clients/:clientId', clienteController.getClientById.bind(clienteController));
+router.delete('/clients/:clientId', clienteController.deleteClient.bind(clienteController));
+router.put('/clients/:clientId',
     upload.fields([
         { name: 'documentFront', maxCount: 1 },
         { name: 'documentBack', maxCount: 1 }
     ]) as any,
     clienteController.updateClient.bind(clienteController)
 );
-router.post('/clientes',
+router.post('/clients',
     upload.fields([
         { name: 'documentFront', maxCount: 1 },
         { name: 'documentBack', maxCount: 1 }
     ]) as any,
     clienteController.createClient.bind(clienteController)
 );
-router.get('/clientes/:clientId/doc-frente', clienteController.getDocumentoFrente.bind(clienteController));
-router.get('/clientes/:clientId/doc-verso', clienteController.getDocumentoVerso.bind(clienteController));
+router.get('/clients/:clientId/doc-frente', clienteController.getDocumentoFrente.bind(clienteController));
+router.get('/clients/:clientId/doc-verso', clienteController.getDocumentoVerso.bind(clienteController));
 
 // --- PRÉDIOS ---
 router.post('/predios', predioController.createPredio.bind(predioController));
