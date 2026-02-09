@@ -1,0 +1,212 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider          = "mysql"
+  url               = env("DATABASE_URL")
+}
+
+model User {
+  id        String   @id @default(uuid())
+  email     String   @unique
+  password  String
+  role      Role     @default(INQUILINO)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  cliente Cliente?
+  avisos  Avisos[]
+}
+
+model Cliente {
+  id             String   @id @default(uuid())
+  nome           String
+  cpf            String   @unique
+  rg             String?  @unique
+  dataNascimento DateTime
+  telefone       String
+  enderecoAtual  String?
+
+  docFrenteUrl String?
+  docVersoUrl  String?
+  fotoRostoUrl String?
+
+  statusCadastro   StatusCadastro @default(PENDENTE_APROVACAO)
+  motivoReprovacao String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  userId String @unique
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  contratos Contrato[]
+}
+
+model Predio {
+  id       String @id @default(uuid())
+  nome     String
+  endereco String
+  bairro   String
+  cidade   String
+  estado   String
+
+  diaVencimentoPadrao Int   @default(5)
+  precoKwhAtual       Float @default(0.70)
+
+  finalidade FinalidadeEstabelecimento @default(RESIDENCIAL)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  apartamentos Apartamento[]
+}
+
+model Apartamento {
+  id     String @id @default(uuid())
+  numero String
+  andar  Int?
+
+  valorBase   Float?
+  climatizado Boolean @default(false)
+
+  status StatusApartamento @default(VAGO)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  predioId String
+  predio   Predio @relation(fields: [predioId], references: [id], onDelete: Cascade)
+
+  contratos Contrato[]
+}
+
+model Contrato {
+  id String @id @default(uuid())
+
+  status StatusContrato @default(SOLICITADO)
+
+  dataInicio    DateTime
+  dataFim       DateTime?
+  duracaoMeses  Int
+  diaVencimento Int
+  valorAluguel  Float
+
+  leituraInicial  Float
+  limiteKwhIsento Float @default(0)
+
+  linkPdfContrato String?
+  assinado        Boolean @default(false)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  apartamentoId String
+  apartamento   Apartamento @relation(fields: [apartamentoId], references: [id])
+
+  clienteId String
+  cliente   Cliente @relation(fields: [clienteId], references: [id])
+
+  faturas Fatura[]
+}
+
+model Fatura {
+  id             String   @id @default(uuid())
+  mesReferencia  DateTime
+  dataVencimento DateTime
+
+  valorAluguel Float
+  valorMulta   Float @default(0)
+
+  leituraAnterior Float
+  leituraAtual    Float
+  fotoLeituraUrl  String?
+
+  consumoTotal     Float
+  consumoCobrado   Float
+  precoKwhAplicado Float
+  valorEnergia     Float
+
+  descontoAplicado  Float   @default(0)
+  acrescimoAplicado Float   @default(0)
+  observacao        String?
+
+  valorTotal Float
+
+  status          StatusPagamento @default(PENDENTE)
+  dataPagamento   DateTime?
+  metodoPagamento String?
+  comprovanteUrl  String?
+
+  tentativasCobranca Int       @default(0)
+  ultimaNotificacao  DateTime?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  contratoId String
+  contrato   Contrato @relation(fields: [contratoId], references: [id], onDelete: Cascade)
+}
+
+model Avisos {
+  id        String    @id @default(uuid())
+  lido      Boolean   @default(false)
+  titulo    String
+  conteudo  String    @db.Text
+  tipo      TipoAviso @default(GERAL)
+  createdAt DateTime  @default(now())
+
+  userId String
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+enum Role {
+  ADMIN
+  INQUILINO
+}
+
+enum StatusCadastro {
+  PENDENTE_APROVACAO
+  APROVADO
+  REPROVADO
+  BLOQUEADO
+}
+
+enum StatusApartamento {
+  VAGO
+  OCUPADO
+  MANUTENCAO
+}
+
+enum StatusContrato {
+  SOLICITADO
+  AGUARDANDO_DADOS_DONO
+  AGUARDANDO_ASSINATURA
+  ATIVO
+  ENCERRADO
+  CANCELADO
+  DESPEJO
+}
+
+enum StatusPagamento {
+  PENDENTE
+  EM_ANALISE
+  PAGO
+  ATRASADO
+  CANCELADO
+  CONTESTADO
+}
+
+enum FinalidadeEstabelecimento {
+  RESIDENCIAL
+  COMERCIAL
+  MISTO
+}
+
+enum TipoAviso {
+  GERAL
+  COBRANCA
+  MANUTENCAO
+  SISTEMA
+}
