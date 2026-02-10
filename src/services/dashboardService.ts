@@ -1,7 +1,7 @@
 import prismaClient from "../prisma";
 import dayjs from "dayjs";
 import { StatusPagamento, StatusContrato, StatusApartamento, StatusCadastro } from "@prisma/client";
-import { addMonths, isBefore, addDays, startOfMonth, endOfMonth } from "date-fns";
+import { addMonths, isBefore, addDays, startOfMonth, endOfMonth, startOfYear, endOfYear } from "date-fns";
 
 class DashboardService {
 
@@ -10,85 +10,126 @@ class DashboardService {
         const inicioMes = startOfMonth(hoje);
         const fimMes = endOfMonth(hoje);
 
-        const ganhos = await prismaClient.fatura.aggregate({
-            _sum: { valorTotal: true, valorEnergia: true, valorAluguel: true, valorMulta: true },
-            where: { status: StatusPagamento.PAGO }
-        });
-
-        const previsaoMes = await prismaClient.fatura.aggregate({
+        // 1. RECEBIDO NO MÊS (Caixa Real)
+        // Soma tudo que foi PAGO onde a data do pagamento é dentro deste mês
+        const recebidoMesAgregado = await prismaClient.fatura.aggregate({
             _sum: { valorTotal: true },
             where: {
-                dataVencimento: { gte: inicioMes, lte: fimMes },
+                status: StatusPagamento.PAGO,
+                dataPagamento: {
+                    gte: inicioMes,
+                    lte: fimMes
+                }
+            }
+        });
+
+        // 2. PREVISÃO TOTAL DO MÊS (Potencial)
+        // Soma tudo que VENCE neste mês (independente se pagou ou não), exceto cancelados
+        const previstoMesAgregado = await prismaClient.fatura.aggregate({
+            _sum: { valorTotal: true },
+            where: {
+                dataVencimento: {
+                    gte: inicioMes,
+                    lte: fimMes
+                },
                 status: { not: StatusPagamento.CANCELADO }
             }
         });
 
-        const inadimplencia = await prismaClient.fatura.aggregate({
+        // 3. INADIMPLÊNCIA GERAL (Acumulado)
+        // Soma tudo que está pendente/atrasado e já venceu (antes de hoje)
+        const atrasadoGeralAgregado = await prismaClient.fatura.aggregate({
             _sum: { valorTotal: true },
             where: {
-                status: { in: [StatusPagamento.PENDENTE, StatusPagamento.ATRASADO] },
-                dataVencimento: { lt: hoje }
+                OR: [
+                    { status: StatusPagamento.ATRASADO },
+                    { status: StatusPagamento.PENDENTE, dataVencimento: { lt: hoje } }
+                ]
             }
         });
 
-        const totalGanho = ganhos._sum.valorTotal || 0;
-        const totalAtrasado = inadimplencia._sum.valorTotal || 0;
-        const receitaPrevista = previsaoMes._sum.valorTotal || 0;
+        // Valores limpos
+        const totalRecebidoMes = recebidoMesAgregado._sum.valorTotal || 0;
+        const totalPrevistoMes = previstoMesAgregado._sum.valorTotal || 0;
+        const totalAtrasado = atrasadoGeralAgregado._sum.valorTotal || 0;
 
-        const todosContratos = await prismaClient.contrato.findMany({
+        // 4. DADOS AUXILIARES (Ocupação e Clientes)
+        const totalApartamentos = await prismaClient.apartamento.count();
+        const apartamentosOcupados = await prismaClient.apartamento.count({ where: { status: StatusApartamento.OCUPADO } });
+        const porcentagemOcupacao = totalApartamentos > 0 ? ((apartamentosOcupados / totalApartamentos) * 100).toFixed(1) : 0;
+        const clientesPendentes = await prismaClient.cliente.count({ where: { statusCadastro: StatusCadastro.PENDENTE_APROVACAO } });
+        const contratosAtivos = await prismaClient.contrato.count({ where: { status: StatusContrato.ATIVO } });
+
+        // 5. GRÁFICO DE FATURAMENTO ANUAL (Jan a Dez)
+        const anoAtual = hoje.getFullYear();
+        const pagamentosAno = await prismaClient.fatura.findMany({
+            where: {
+                status: StatusPagamento.PAGO,
+                dataPagamento: {
+                    gte: startOfYear(hoje),
+                    lte: endOfYear(hoje)
+                }
+            },
+            select: { dataPagamento: true, valorTotal: true }
+        });
+
+        const faturamentoPorMes = Array(12).fill(0);
+        pagamentosAno.forEach(f => {
+            if (f.dataPagamento) {
+                const mes = f.dataPagamento.getMonth();
+                faturamentoPorMes[mes] += f.valorTotal;
+            }
+        });
+
+        const monthlyRevenueData = {
+            labels: ['Jan', 'Fev', 'Mar', 'Abr', 'Mai', 'Jun', 'Jul', 'Ago', 'Set', 'Out', 'Nov', 'Dez'],
+            data: faturamentoPorMes
+        };
+
+        // 6. ALERTA DE CONTRATOS VENCENDO (Próximos 30 dias)
+        // Busca contratos ativos e calcula se vence logo
+        const contratosDb = await prismaClient.contrato.findMany({
             where: { status: StatusContrato.ATIVO },
             include: { cliente: { select: { nome: true } }, apartamento: { select: { numero: true } } }
         });
 
-        const contratosVencendo = todosContratos.filter(c => {
-            const dataFimCalculada = addMonths(new Date(c.dataInicio), c.duracaoMeses);
-            const daqui30Dias = addDays(hoje, 30);
-            return isBefore(dataFimCalculada, daqui30Dias) && isBefore(hoje, dataFimCalculada);
+        const contratosVencendo = contratosDb.filter(c => {
+            // Calcula data final (inicio + duracao)
+            const dataFim = new Date(c.dataInicio);
+            dataFim.setMonth(dataFim.getMonth() + c.duracaoMeses);
+
+            const trintaDias = new Date();
+            trintaDias.setDate(trintaDias.getDate() + 30);
+
+            return dataFim > hoje && dataFim <= trintaDias;
         }).map(c => ({
             id: c.id,
             cliente: c.cliente.nome,
             apartamento: c.apartamento.numero,
-            vencimento: addMonths(new Date(c.dataInicio), c.duracaoMeses)
+            vencimento: new Date(new Date(c.dataInicio).setMonth(new Date(c.dataInicio).getMonth() + c.duracaoMeses))
         }));
 
-        const apartamentosOcupados = await prismaClient.apartamento.count({ where: { status: StatusApartamento.OCUPADO } });
-        const totalApartamentos = await prismaClient.apartamento.count();
-        const clientesPendentes = await prismaClient.cliente.count({ where: { statusCadastro: StatusCadastro.PENDENTE_APROVACAO } });
 
-        const anoAtual = dayjs().year();
-        const pagamentosAno = await prismaClient.fatura.findMany({
-            where: {
-                dataPagamento: { gte: new Date(`${anoAtual}-01-01`), lt: new Date(`${anoAtual + 1}-01-01`) },
-                status: StatusPagamento.PAGO,
-            },
-            select: { dataPagamento: true, valorTotal: true },
-        });
-
-        const faturamentoPorMes = Array(12).fill(0);
-        pagamentosAno.forEach(({ dataPagamento, valorTotal }) => {
-            if (dataPagamento) faturamentoPorMes[dataPagamento.getMonth()] += valorTotal;
-        });
-
+        // RETORNO FINAL
         return {
             cards: {
-                totalGanho,
-                receitaPrevista,
-                totalAtrasado,
-                taxaOcupacao: totalApartamentos > 0 ? ((apartamentosOcupados / totalApartamentos) * 100).toFixed(1) : 0,
-                clientesPendentes
+                recebidoMes: totalRecebidoMes,
+                previstoMes: totalPrevistoMes,
+                atrasadoGeral: totalAtrasado,
+                taxaOcupacao: Number(porcentagemOcupacao),
+                clientesPendentes,
+                contratosAtivos
+            },
+            charts: {
+                monthlyRevenue: monthlyRevenueData,
+                // Gráfico Pizza: Do previsto do mês, quanto já recebi e quanto falta
+                statusFinanceiroMes: {
+                    labels: ['Recebido', 'A Receber'],
+                    data: [totalRecebidoMes, Math.max(0, totalPrevistoMes - totalRecebidoMes)]
+                }
             },
             alerts: {
                 contratosVencendo
-            },
-            charts: {
-                monthlyRevenue: {
-                    labels: ['Jan', 'Fev', 'Mar', 'Abr', 'Mai', 'Jun', 'Jul', 'Ago', 'Set', 'Out', 'Nov', 'Dez'],
-                    data: faturamentoPorMes
-                },
-                financialStatus: {
-                    labels: ["Pago", "Aberto", "Atrasado"],
-                    data: [totalGanho, (receitaPrevista - totalGanho), totalAtrasado]
-                }
             }
         };
     }
