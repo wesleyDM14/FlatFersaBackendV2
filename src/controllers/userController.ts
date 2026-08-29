@@ -90,6 +90,18 @@ class UserController {
         }
     }
 
+    async updateMyPushToken(req: Request, res: Response) {
+        try {
+            const { pushToken } = req.body;
+            if (!pushToken) return res.status(400).json({ message: 'Token não informado.' });
+
+            await userService.updateMyPushToken(req.user.id, pushToken);
+            return res.json({ message: 'Token registrado com sucesso.' });
+        } catch (error: any) {
+            return res.status(400).json({ message: error.message });
+        }
+    }
+
     async adminResetClientPassword(req: Request, res: Response) {
         try {
             if (req.user.role !== 'ADMIN') {

@@ -59,6 +59,7 @@ router.use(authenticateUser);
 router.get('/me', userController.getLoggedUserInfo.bind(userController));
 router.put('/me', userController.updateMyProfile.bind(userController));
 router.put('/me/password', userController.updateMyPassword.bind(userController));
+router.put('/me/push-token', userController.updateMyPushToken.bind(userController));
 
 // --- ADMINISTRAÇÃO ---
 router.post('/users/approve', AuthController.aproveAccess);

@@ -138,6 +138,13 @@ class UserService {
         return { message: "Senha resetada com sucesso." };
     }
 
+    async updateMyPushToken(userId: string, pushToken: string) {
+        await prismaClient.user.update({
+            where: { id: userId },
+            data: { pushToken }
+        });
+    }
+
     async updateMyProfile(userId: string, dados: { name?: string; phone?: string; address?: string }) {
         const user = await prismaClient.user.findUnique({ where: { id: userId }, include: { cliente: true } });
         if (!user) throw new Error('Usuário não encontrado.');
