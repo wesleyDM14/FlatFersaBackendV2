@@ -625,7 +625,8 @@ class ContratoService {
         return await prismaClient.contrato.findMany({
             include: {
                 cliente: true,
-                apartamento: { include: { predio: true } }
+                apartamento: { include: { predio: true } },
+                faturas: { orderBy: { dataVencimento: 'asc' } }
             },
             orderBy: { createdAt: 'desc' }
         });
