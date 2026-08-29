@@ -1,12 +1,12 @@
 import { CronJob } from "cron";
 import prismaClient from "../prisma";
-import { StatusPagamento, StatusContrato } from "@prisma/client";
-import { addDays, differenceInDays, isBefore } from "date-fns";
+import { StatusPagamento, StatusContrato, TipoAviso, Role } from "@prisma/client";
+import { addDays, differenceInDays } from "date-fns";
 import fs from 'fs';
 import path from 'path';
 import { EmailService } from "../functions/emailService";
 import { EmailTemplates } from "../functions/email-templates";
-import { getDataAtualBrasil } from "../utils/dateUtils";
+import { getDataAtualBrasil, verificarAtraso, intervaloDoDiaBrasil } from "../utils/dateUtils";
 
 const emailService = new EmailService();
 
@@ -29,15 +29,23 @@ class CronService {
     }
 
     async verificarAtrasos() {
-        const hoje = getDataAtualBrasil();
-        await prismaClient.fatura.updateMany({
-            where: {
-                status: StatusPagamento.PENDENTE,
-                dataVencimento: { lt: hoje }
-            },
-            data: { status: StatusPagamento.ATRASADO }
+        const candidatas = await prismaClient.fatura.findMany({
+            where: { status: StatusPagamento.PENDENTE },
+            select: { id: true, dataVencimento: true }
         });
-        console.log('[CRON] Status de faturas atualizados para ATRASADO.');
+
+        const idsAtrasadas = candidatas
+            .filter(f => verificarAtraso(f.dataVencimento))
+            .map(f => f.id);
+
+        if (idsAtrasadas.length > 0) {
+            await prismaClient.fatura.updateMany({
+                where: { id: { in: idsAtrasadas } },
+                data: { status: StatusPagamento.ATRASADO }
+            });
+        }
+
+        console.log(`[CRON] ${idsAtrasadas.length} fatura(s) atualizada(s) para ATRASADO.`);
     }
 
     async aplicarMultas() {
@@ -75,10 +83,16 @@ class CronService {
         const hoje = getDataAtualBrasil();
         const daqui3Dias = addDays(hoje, 3);
 
+        const hojeIntervalo = intervaloDoDiaBrasil(hoje);
+        const daqui3DiasIntervalo = intervaloDoDiaBrasil(daqui3Dias);
+
         const faturasParaAvisar = await prismaClient.fatura.findMany({
             where: {
                 status: StatusPagamento.PENDENTE,
-                dataVencimento: { in: [hoje, daqui3Dias] }
+                OR: [
+                    { dataVencimento: { gte: hojeIntervalo.inicio, lte: hojeIntervalo.fim } },
+                    { dataVencimento: { gte: daqui3DiasIntervalo.inicio, lte: daqui3DiasIntervalo.fim } }
+                ]
             },
             include: {
                 contrato: { include: { cliente: { include: { user: true } } } }
@@ -86,8 +100,8 @@ class CronService {
         });
 
         for (const fatura of faturasParaAvisar) {
+            const cliente = fatura.contrato.cliente;
             try {
-                const cliente = fatura.contrato.cliente;
                 await emailService.sendEmail({
                     to: cliente.user.email,
                     subject: `Lembrete: Fatura Vencendo - ${fatura.dataVencimento.toLocaleDateString('pt-BR')}`,
@@ -101,6 +115,15 @@ class CronService {
             } catch (error) {
                 console.error(`Erro ao notificar fatura ${fatura.id}`);
             }
+
+            await prismaClient.avisos.create({
+                data: {
+                    userId: cliente.user.id,
+                    titulo: 'Fatura Próxima do Vencimento',
+                    conteudo: `Sua fatura de ${fatura.dataVencimento.toLocaleDateString('pt-BR')} no valor de R$ ${fatura.valorTotal.toFixed(2)} está próxima do vencimento.`,
+                    tipo: TipoAviso.COBRANCA
+                }
+            });
         }
     }
 
@@ -108,18 +131,57 @@ class CronService {
         const hoje = getDataAtualBrasil();
 
         const contratosAtivos = await prismaClient.contrato.findMany({
-            where: { status: StatusContrato.ATIVO }
+            where: { status: StatusContrato.ATIVO, dataFim: { not: null } },
+            include: { cliente: { include: { user: true } }, apartamento: true }
         });
 
         for (const contrato of contratosAtivos) {
-            const dataFim = addDays(new Date(contrato.dataInicio), contrato.duracaoMeses * 30);
+            if (!contrato.dataFim) continue;
 
-            if (isBefore(dataFim, hoje)) {
-                await emailService.sendEmail({
-                    to: process.env.ADMIN_EMAIL as string,
-                    subject: 'Alerta: Contrato Vencido',
-                    html: `<p>O contrato do cliente <strong>${contrato.clienteId}</strong> chegou ao fim do prazo.</p>`
+            const diasRestantes = differenceInDays(contrato.dataFim, hoje);
+            const dataFimFormatada = contrato.dataFim.toLocaleDateString('pt-BR');
+
+            if ([30, 15, 7].includes(diasRestantes)) {
+                await prismaClient.avisos.create({
+                    data: {
+                        userId: contrato.cliente.user.id,
+                        titulo: 'Seu contrato está terminando',
+                        conteudo: `Seu contrato termina em ${diasRestantes} dias (${dataFimFormatada}). Fale com a administração para renovar ou organizar sua saída.`,
+                        tipo: TipoAviso.SISTEMA
+                    }
                 });
+
+                try {
+                    await emailService.sendEmail({
+                        to: contrato.cliente.user.email,
+                        subject: `Seu contrato termina em ${diasRestantes} dias`,
+                        html: EmailTemplates.CLIENTE_CONTRATO_VENCENDO(contrato.cliente.nome, dataFimFormatada)
+                    });
+                } catch (error) {
+                    console.error(`Erro ao notificar fim de contrato ${contrato.id}`);
+                }
+            }
+
+            if (diasRestantes <= 0) {
+                const admins = await prismaClient.user.findMany({ where: { role: Role.ADMIN } });
+                await prismaClient.avisos.createMany({
+                    data: admins.map(admin => ({
+                        userId: admin.id,
+                        titulo: 'Contrato Vencido',
+                        conteudo: `O contrato de ${contrato.cliente.nome} (apto ${contrato.apartamento.numero}) venceu em ${dataFimFormatada} e ainda está ATIVO. Renove, transfira ou encerre.`,
+                        tipo: TipoAviso.SISTEMA
+                    }))
+                });
+
+                try {
+                    await emailService.sendEmail({
+                        to: process.env.ADMIN_EMAIL as string,
+                        subject: 'Alerta: Contrato Vencido',
+                        html: EmailTemplates.ADMIN_CONTRATO_VENCENDO(contrato.cliente.nome, contrato.apartamento.numero, dataFimFormatada)
+                    });
+                } catch (error) {
+                    console.error(`Erro ao notificar admin sobre contrato vencido ${contrato.id}`);
+                }
             }
         }
     }

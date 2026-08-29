@@ -215,6 +215,13 @@ class ClienteService {
 
         if (!client) throw new Error('Cliente não encontrado.');
 
+        const contratoAtivo = await prismaClient.contrato.findFirst({
+            where: { clienteId: clientId, status: { in: ['ATIVO', 'AGUARDANDO_ASSINATURA', 'SOLICITADO'] } }
+        });
+        if (contratoAtivo) {
+            throw new Error('Não é possível excluir um cliente com contrato ativo ou em andamento. Cancele o contrato primeiro.');
+        }
+
         await prismaClient.user.delete({ where: { id: client.userId } });
 
         return;

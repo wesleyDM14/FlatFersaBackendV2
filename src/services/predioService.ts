@@ -86,10 +86,23 @@ class PredioService {
     }
 
     async deletePredio(predioId: string) {
-        const existingPredio = await prismaClient.predio.findUnique({ where: { id: predioId } });
+        const existingPredio = await prismaClient.predio.findUnique({
+            where: { id: predioId },
+            include: { apartamentos: { select: { id: true } } }
+        });
 
         if (!existingPredio) {
             throw new Error('Prédio não encontrado.');
+        }
+
+        const apartamentoIds = existingPredio.apartamentos.map(a => a.id);
+        if (apartamentoIds.length > 0) {
+            const contratoAtivo = await prismaClient.contrato.findFirst({
+                where: { apartamentoId: { in: apartamentoIds }, status: { in: ['ATIVO', 'AGUARDANDO_ASSINATURA', 'SOLICITADO'] } }
+            });
+            if (contratoAtivo) {
+                throw new Error('Não é possível excluir um prédio com apartamentos ocupados ou em processo de locação.');
+            }
         }
 
         await prismaClient.predio.delete({ where: { id: predioId } });

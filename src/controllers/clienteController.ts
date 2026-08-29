@@ -76,6 +76,10 @@ class ClienteController {
 
             const { name, cpf, rg, dateBirth, phone, address } = req.body;
 
+            if (!name || !cpf || !rg || !dateBirth || !phone) {
+                return res.status(400).json({ message: 'Nome, CPF, RG, data de nascimento e telefone são obrigatórios.' });
+            }
+
             await clienteService.updateClient(
                 clientId,
                 req.user.id,
@@ -118,6 +122,8 @@ class ClienteController {
             const clientId = req.params.clientId;
             if (!clientId) return res.status(400).json({ message: 'ID obrigatório.' });
 
+            await clienteService.getClientById(clientId, req.user.id, req.user.role);
+
             const { stream, contentType, fileName } = await clienteService.getDocumentFrente(clientId);
 
             res.setHeader("Content-Type", contentType);
@@ -133,6 +139,8 @@ class ClienteController {
         try {
             const clientId = req.params.clientId;
             if (!clientId) return res.status(400).json({ message: 'ID obrigatório.' });
+
+            await clienteService.getClientById(clientId, req.user.id, req.user.role);
 
             const { stream, contentType, fileName } = await clienteService.getDocumentVerso(clientId);
 

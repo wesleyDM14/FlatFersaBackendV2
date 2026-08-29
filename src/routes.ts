@@ -57,6 +57,7 @@ router.use(authenticateUser);
 
 // --- USER & PERFIL ---
 router.get('/me', userController.getLoggedUserInfo.bind(userController));
+router.put('/me', userController.updateMyProfile.bind(userController));
 router.put('/me/password', userController.updateMyPassword.bind(userController));
 
 // --- ADMINISTRAÇÃO ---
@@ -104,10 +105,14 @@ router.put('/apartamentos/:apartamentoId', apartamentoController.updateApartamen
 router.delete('/apartamentos/:apartamentoId', apartamentoController.deleteApartamento.bind(apartamentoController));
 
 // --- CONTRATOS ---
+router.post('/contratos', contratoController.criarContratoDireto.bind(contratoController));
 router.post('/contratos/solicitar', contratoController.solicitarContrato.bind(contratoController));
 router.put('/contratos/configurar', contratoController.configurarContrato.bind(contratoController));
 router.put('/contratos/:contratoId/reprovar', contratoController.reprovarContrato.bind(contratoController));
 router.put('/contratos/cancelar', contratoController.cancelarContrato.bind(contratoController));
+router.put('/contratos/:contratoId/editar', contratoController.editarContrato.bind(contratoController));
+router.post('/contratos/:contratoId/renovar', contratoController.renovarContrato.bind(contratoController));
+router.post('/contratos/:contratoId/transferir', contratoController.transferirApartamento.bind(contratoController));
 router.get('/contratos', contratoController.getContratos.bind(contratoController));
 router.get('/me/contratos', contratoController.getMeusContratos.bind(contratoController));
 router.get('/contratos/:contratoId', contratoController.getContratoById.bind(contratoController));

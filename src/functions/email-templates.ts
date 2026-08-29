@@ -368,14 +368,14 @@ export const EmailTemplates = {
     baseTemplate(
       `<div style="color: #4a5568;">
         <div style="text-align: center; margin: 25px 0;">
-          <div style="display: inline-block; background-color: #f56565; color: white; 
+          <div style="display: inline-block; background-color: #f56565; color: white;
                padding: 10px 20px; border-radius: 20px; font-size: 14px;">
             Pagamento Requer Ajustes ⚠️
           </div>
         </div>
 
         <p>Olá <strong>${clientName}</strong>,</p>
-        
+
         <div style="background-color: #fff5f5; padding: 20px; border-radius: 8px;">
           <p style="margin: 5px 0; color: #c53030;">
             Parcela: <strong>${dueDate}</strong><br>
@@ -386,5 +386,102 @@ export const EmailTemplates = {
       </div>`,
       `Atenção: Pagamento Reprovado - ${dueDate}`,
       "Atenciosamente, Equipe Financeira"
+    ),
+
+  CLIENTE_CADASTRO_REPROVADO: (clientName: string, reason: string) =>
+    baseTemplate(
+      `<div style="color: #4a5568;">
+        <div style="background-color: #fff5f5; padding: 20px; border-radius: 8px;">
+          <p style="margin: 5px 0; color: #c53030;">
+            Infelizmente seu cadastro não foi aprovado.<br>
+            Motivo: <strong>${reason}</strong>
+          </p>
+        </div>
+        <p>Você pode corrigir os dados/documentos e enviar uma nova solicitação, ou entrar em contato com nosso suporte.</p>
+      </div>`,
+      `Olá, ${clientName}`,
+      "Atenciosamente, Equipe de Cadastro"
+    ),
+
+  CLIENTE_CONTRATO_CANCELADO: (clientName: string, reason: string) =>
+    baseTemplate(
+      `<div style="color: #4a5568;">
+        <div style="background-color: #fff5f5; padding: 20px; border-radius: 8px;">
+          <p style="margin: 5px 0; color: #c53030;">
+            Seu contrato foi encerrado administrativamente.<br>
+            Motivo: <strong>${reason}</strong>
+          </p>
+        </div>
+      </div>`,
+      `Olá, ${clientName}`,
+      "Atenciosamente, Equipe de Contratos"
+    ),
+
+  CLIENTE_CONTRATO_EDITADO: (clientName: string, novoValor: number, novoDiaVencimento: number) =>
+    baseTemplate(
+      `<div style="color: #4a5568;">
+        <p>As condições do seu contrato foram atualizadas pelo administrador:</p>
+        <div style="background-color: #ebf4ff; padding: 20px; border-radius: 8px; margin: 20px 0;">
+          <p style="margin: 5px 0;">💰 Novo valor do aluguel: <strong>R$ ${novoValor.toFixed(2)}</strong></p>
+          <p style="margin: 5px 0;">📅 Novo dia de vencimento: <strong>${novoDiaVencimento}</strong></p>
+        </div>
+        <p style="color: #718096; font-size: 14px;">As faturas ainda não pagas foram atualizadas para refletir os novos valores.</p>
+      </div>`,
+      `Olá, ${clientName}`,
+      "Atenciosamente, Equipe de Contratos"
+    ),
+
+  CLIENTE_CONTRATO_RENOVADO: (clientName: string, duracaoMeses: number) =>
+    baseTemplate(
+      `<div style="color: #4a5568;">
+        <div style="text-align: center; margin: 25px 0;">
+          <div style="display: inline-block; background-color: #48bb78; color: white;
+               padding: 10px 20px; border-radius: 20px; font-size: 14px;">
+            Contrato Renovado ✅
+          </div>
+        </div>
+        <p>Seu contrato foi renovado por mais <strong>${duracaoMeses} meses</strong>. As novas faturas já estão disponíveis na plataforma.</p>
+      </div>`,
+      `Parabéns, ${clientName}!`,
+      "Atenciosamente, Equipe de Contratos"
+    ),
+
+  CLIENTE_CONTRATO_TRANSFERIDO: (clientName: string, novoApartamento: string) =>
+    baseTemplate(
+      `<div style="color: #4a5568;">
+        <p>Seu contrato foi transferido com sucesso para o apartamento <strong>${novoApartamento}</strong>.</p>
+        <p style="color: #718096; font-size: 14px;">Um novo contrato e novas faturas foram gerados para o novo imóvel.</p>
+      </div>`,
+      `Olá, ${clientName}`,
+      "Atenciosamente, Equipe de Contratos"
+    ),
+
+  CLIENTE_CONTRATO_VENCENDO: (clientName: string, dataFim: string) =>
+    baseTemplate(
+      `<div style="color: #4a5568;">
+        <div style="text-align: center; margin: 25px 0;">
+          <div style="display: inline-block; background-color: #f6ad55; color: white;
+               padding: 10px 20px; border-radius: 20px; font-size: 14px;">
+            Contrato Próximo do Fim ⏳
+          </div>
+        </div>
+        <p>Seu contrato termina em <strong>${dataFim}</strong>. Entre em contato com a administração para renovar ou organizar sua saída do imóvel.</p>
+      </div>`,
+      `Olá, ${clientName}`,
+      "Atenciosamente, Equipe de Contratos"
+    ),
+
+  ADMIN_CONTRATO_VENCENDO: (clientName: string, apartamento: string, dataFim: string) =>
+    baseTemplate(
+      `<div style="color: #4a5568;">
+        <p style="margin-top: 0;">Um contrato ativo passou da data de término e ainda não foi renovado, transferido ou encerrado:</p>
+        <div style="border-left: 4px solid #f56565; padding-left: 15px; margin: 20px 0;">
+          <p style="margin: 5px 0;">👤 Cliente: <strong>${clientName}</strong></p>
+          <p style="margin: 5px 0;">🏠 Apartamento: <strong>${apartamento}</strong></p>
+          <p style="margin: 5px 0;">📅 Término: <strong>${dataFim}</strong></p>
+        </div>
+      </div>`,
+      "Alerta: Contrato Vencido",
+      "Notificação Automática - Sistema de Contratos"
     )
 };

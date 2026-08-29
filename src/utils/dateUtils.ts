@@ -23,3 +23,10 @@ export function formatarDataBr(data: Date): string {
 export function adicionarMeses(data: Date, meses: number): Date {
     return addMonths(data, meses);
 }
+
+export function intervaloDoDiaBrasil(data: Date): { inicio: Date; fim: Date } {
+    return {
+        inicio: toZonedTime(startOfDay(data), TIMEZONE),
+        fim: toZonedTime(endOfDay(data), TIMEZONE)
+    };
+}

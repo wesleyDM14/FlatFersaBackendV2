@@ -67,9 +67,23 @@ class UserController {
         try {
             const { currentPassword, newPassword, confirmPassword } = req.body;
 
+            if (!currentPassword || !newPassword || !confirmPassword) {
+                return res.status(400).json({ message: 'Preencha a senha atual e a nova senha (com confirmação).' });
+            }
+
             userService.validatePassword(newPassword, confirmPassword);
 
             const result = await userService.updateUserPassword(req.user.id, currentPassword, newPassword);
+            return res.json(result);
+        } catch (error: any) {
+            return res.status(400).json({ message: error.message });
+        }
+    }
+
+    async updateMyProfile(req: Request, res: Response) {
+        try {
+            const { name, phone, address } = req.body;
+            const result = await userService.updateMyProfile(req.user.id, { name, phone, address });
             return res.json(result);
         } catch (error: any) {
             return res.status(400).json({ message: error.message });

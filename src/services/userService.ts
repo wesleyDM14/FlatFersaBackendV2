@@ -85,6 +85,8 @@ class UserService {
             email: user.email,
             role: "INQUILINO",
             name: user.cliente?.nome || "Usuário",
+            phone: user.cliente?.telefone || '',
+            address: user.cliente?.enderecoAtual || '',
             status: user.cliente?.statusCadastro,
             avatar: user.cliente?.fotoRostoUrl || null
         };
@@ -136,7 +138,39 @@ class UserService {
         return { message: "Senha resetada com sucesso." };
     }
 
+    async updateMyProfile(userId: string, dados: { name?: string; phone?: string; address?: string }) {
+        const user = await prismaClient.user.findUnique({ where: { id: userId }, include: { cliente: true } });
+        if (!user) throw new Error('Usuário não encontrado.');
+
+        if (!user.cliente) {
+            return { message: 'Nada para atualizar.' };
+        }
+
+        await prismaClient.cliente.update({
+            where: { id: user.cliente.id },
+            data: {
+                nome: dados.name || user.cliente.nome,
+                telefone: dados.phone || user.cliente.telefone,
+                enderecoAtual: dados.address ?? user.cliente.enderecoAtual
+            }
+        });
+
+        return { message: 'Perfil atualizado com sucesso.' };
+    }
+
     async deleteUserById(userId: string) {
+        const user = await prismaClient.user.findUnique({ where: { id: userId }, include: { cliente: true } });
+        if (!user) throw new Error('Usuário não encontrado.');
+
+        if (user.cliente) {
+            const contratoAtivo = await prismaClient.contrato.findFirst({
+                where: { clienteId: user.cliente.id, status: { in: ['ATIVO', 'AGUARDANDO_ASSINATURA', 'SOLICITADO'] } }
+            });
+            if (contratoAtivo) {
+                throw new Error('Não é possível excluir um usuário com contrato ativo ou em andamento.');
+            }
+        }
+
         await prismaClient.user.delete({ where: { id: userId } });
         return;
     }

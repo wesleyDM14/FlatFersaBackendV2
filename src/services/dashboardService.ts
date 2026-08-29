@@ -1,7 +1,7 @@
 import prismaClient from "../prisma";
-import dayjs from "dayjs";
 import { StatusPagamento, StatusContrato, StatusApartamento, StatusCadastro } from "@prisma/client";
-import { addMonths, isBefore, addDays, startOfMonth, endOfMonth, startOfYear, endOfYear } from "date-fns";
+import { startOfMonth, endOfMonth, startOfYear, endOfYear } from "date-fns";
+import { verificarAtraso } from "../utils/dateUtils";
 
 class DashboardService {
 
@@ -37,21 +37,24 @@ class DashboardService {
         });
 
         // 3. INADIMPLÊNCIA GERAL (Acumulado)
-        // Soma tudo que está pendente/atrasado e já venceu (antes de hoje)
-        const atrasadoGeralAgregado = await prismaClient.fatura.aggregate({
-            _sum: { valorTotal: true },
+        // Soma tudo que está ATRASADO, ou PENDENTE mas já passou do fim do dia de vencimento
+        const faturasPendentesOuAtrasadas = await prismaClient.fatura.findMany({
             where: {
                 OR: [
                     { status: StatusPagamento.ATRASADO },
-                    { status: StatusPagamento.PENDENTE, dataVencimento: { lt: hoje } }
+                    { status: StatusPagamento.PENDENTE }
                 ]
-            }
+            },
+            select: { status: true, dataVencimento: true, valorTotal: true }
         });
+
+        const totalAtrasado = faturasPendentesOuAtrasadas
+            .filter(f => f.status === StatusPagamento.ATRASADO || verificarAtraso(f.dataVencimento))
+            .reduce((acc, f) => acc + f.valorTotal, 0);
 
         // Valores limpos
         const totalRecebidoMes = recebidoMesAgregado._sum.valorTotal || 0;
         const totalPrevistoMes = previstoMesAgregado._sum.valorTotal || 0;
-        const totalAtrasado = atrasadoGeralAgregado._sum.valorTotal || 0;
 
         // 4. DADOS AUXILIARES (Ocupação e Clientes)
         const totalApartamentos = await prismaClient.apartamento.count();
@@ -93,21 +96,17 @@ class DashboardService {
             include: { cliente: { select: { nome: true } }, apartamento: { select: { numero: true } } }
         });
 
-        const contratosVencendo = contratosDb.filter(c => {
-            // Calcula data final (inicio + duracao)
-            const dataFim = new Date(c.dataInicio);
-            dataFim.setMonth(dataFim.getMonth() + c.duracaoMeses);
+        const trintaDias = new Date();
+        trintaDias.setDate(trintaDias.getDate() + 30);
 
-            const trintaDias = new Date();
-            trintaDias.setDate(trintaDias.getDate() + 30);
-
-            return dataFim > hoje && dataFim <= trintaDias;
-        }).map(c => ({
-            id: c.id,
-            cliente: c.cliente.nome,
-            apartamento: c.apartamento.numero,
-            vencimento: new Date(new Date(c.dataInicio).setMonth(new Date(c.dataInicio).getMonth() + c.duracaoMeses))
-        }));
+        const contratosVencendo = contratosDb
+            .filter(c => c.dataFim && c.dataFim > hoje && c.dataFim <= trintaDias)
+            .map(c => ({
+                id: c.id,
+                cliente: c.cliente.nome,
+                apartamento: c.apartamento.numero,
+                vencimento: c.dataFim
+            }));
 
 
         // RETORNO FINAL

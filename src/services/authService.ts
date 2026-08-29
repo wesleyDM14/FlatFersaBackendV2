@@ -5,7 +5,7 @@ import axios from 'axios';
 import fs from 'fs';
 
 import getToken from "../functions/getToken";
-import { StatusCadastro, Role } from "@prisma/client";
+import { StatusCadastro, Role, TipoAviso } from "@prisma/client";
 import { EmailService } from "../functions/emailService";
 import { EmailTemplates } from "../functions/email-templates";
 
@@ -181,6 +181,15 @@ export const aprovarAcessoCliente = async (clienteId: string) => {
             data: { statusCadastro: StatusCadastro.APROVADO }
         });
 
+        await prismaClient.avisos.create({
+            data: {
+                userId: cliente.user.id,
+                titulo: 'Cadastro Aprovado',
+                conteudo: 'Seu cadastro foi aprovado! Você já pode acessar a plataforma normalmente.',
+                tipo: TipoAviso.SISTEMA
+            }
+        });
+
         await emailService.sendEmail({
             to: cliente.user.email,
             subject: '✅ Acesso Liberado!',
@@ -200,19 +209,34 @@ export const aprovarAcessoCliente = async (clienteId: string) => {
 
 export const reprovarAcessoCliente = async (clienteId: string, motivo: string) => {
     try {
-        const cliente = await prismaClient.cliente.findUnique({ where: { id: clienteId } });
+        const cliente = await prismaClient.cliente.findUnique({ where: { id: clienteId }, include: { user: true } });
 
         if (!cliente) throw new Error('Cliente não encontrado.');
+
+        const motivoFinal = motivo || "Documentação inconsistente";
 
         await prismaClient.cliente.update({
             where: { id: clienteId },
             data: {
                 statusCadastro: StatusCadastro.REPROVADO,
-                motivoReprovacao: motivo || "Documentação inconsistente"
+                motivoReprovacao: motivoFinal
             }
         });
 
-        // Email avisando da reprovação
+        await prismaClient.avisos.create({
+            data: {
+                userId: cliente.user.id,
+                titulo: 'Cadastro Reprovado',
+                conteudo: `Seu cadastro não foi aprovado. Motivo: ${motivoFinal}`,
+                tipo: TipoAviso.SISTEMA
+            }
+        });
+
+        await emailService.sendEmail({
+            to: cliente.user.email,
+            subject: 'Atualização sobre seu Cadastro',
+            html: EmailTemplates.CLIENTE_CADASTRO_REPROVADO(cliente.nome, motivoFinal)
+        });
 
         return { message: "Cliente reprovado." };
     } catch (error: any) {

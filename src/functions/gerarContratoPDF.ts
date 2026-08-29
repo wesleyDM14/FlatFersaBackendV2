@@ -89,7 +89,7 @@ export async function gerarContratoPDF(contratoId: string, userId: string, dataC
 
         // --- DADOS DO CONTRATO (DATAS) ---
         const dataInicio = new Date(contrato.dataInicio);
-        const dataFim = addMonths(dataInicio, contrato.duracaoMeses);
+        const dataFim = contrato.dataFim ? new Date(contrato.dataFim) : addMonths(dataInicio, contrato.duracaoMeses);
 
         doc.font('Times-Bold').fontSize(12).text('CONDIÇÕES DA LOCAÇÃO', { align: 'left' });
         doc.moveDown(0.5);
@@ -161,7 +161,7 @@ export async function gerarContratoPDF(contratoId: string, userId: string, dataC
         try {
             const imageUrl = 'https://flatfersa.com.br/wp-content/uploads/2024/10/assinatura.png';
             const response = await axios.get(imageUrl, { responseType: 'arraybuffer', timeout: 3000 });
-            const imageBuffer = Buffer.from(response.data, 'base64');
+            const imageBuffer = Buffer.from(response.data);
             doc.image(imageBuffer, 70, doc.y, { width: 150 });
             doc.text('____________________________________________________');
             doc.text('LOCADOR (Assinatura Digital)', { indent: 20 });

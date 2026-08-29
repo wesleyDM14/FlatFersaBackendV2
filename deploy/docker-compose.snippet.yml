@@ -1,0 +1,18 @@
+# Cole este bloco dentro de "services:" no docker-compose.yml da VPS,
+# seguindo o mesmo padrão dos outros serviços (jpl-solar, cied-api, etc).
+#
+# Não há banco dedicado: a API aponta para o MySQL da hospedagem
+# compartilhada da Hostinger através da DATABASE_URL no .env abaixo —
+# exatamente o mesmo banco que já é usado hoje pela versão no Heroku.
+
+  flatfersa-api:
+    build:
+      context: ./flatfersa-api
+    container_name: flatfersa-api
+    restart: unless-stopped
+    env_file: ./flatfersa-api/.env
+    networks:
+      - app-network
+
+# Lembre-se também de adicionar "flatfersa-api" na lista "depends_on"
+# do serviço "nginx" no docker-compose.yml.

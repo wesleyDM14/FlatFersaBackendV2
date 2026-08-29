@@ -1,5 +1,5 @@
 import prismaClient from "../prisma";
-import { StatusPagamento, Role } from "@prisma/client";
+import { StatusPagamento, Role, TipoAviso } from "@prisma/client";
 import { generateQrCodePix } from "../functions/generatePix";
 import getToken from "../functions/getToken";
 import axios from "axios";
@@ -176,6 +176,16 @@ class FaturaService {
             )
         });
 
+        const admins = await prismaClient.user.findMany({ where: { role: Role.ADMIN } });
+        await prismaClient.avisos.createMany({
+            data: admins.map(admin => ({
+                userId: admin.id,
+                titulo: 'Novo Comprovante Recebido',
+                conteudo: `${fatura.contrato.cliente.nome} enviou um comprovante de pagamento de R$ ${fatura.valorTotal.toFixed(2)}.`,
+                tipo: TipoAviso.COBRANCA
+            }))
+        });
+
         return { message: "Comprovante enviado." };
     }
 
@@ -209,6 +219,15 @@ class FaturaService {
                 fatura.dataVencimento.toLocaleDateString('pt-BR'),
                 fatura.valorTotal
             )
+        });
+
+        await prismaClient.avisos.create({
+            data: {
+                userId: fatura.contrato.cliente.user.id,
+                titulo: 'Pagamento Confirmado',
+                conteudo: `Seu pagamento de R$ ${fatura.valorTotal.toFixed(2)} referente a ${fatura.dataVencimento.toLocaleDateString('pt-BR')} foi confirmado.`,
+                tipo: TipoAviso.COBRANCA
+            }
         });
 
         return { message: "Pagamento aprovado." };
@@ -245,6 +264,15 @@ class FaturaService {
                 fatura.dataVencimento.toLocaleDateString('pt-BR'),
                 motivo
             )
+        });
+
+        await prismaClient.avisos.create({
+            data: {
+                userId: fatura.contrato.cliente.user.id,
+                titulo: 'Pagamento Reprovado',
+                conteudo: `Seu comprovante referente a ${fatura.dataVencimento.toLocaleDateString('pt-BR')} foi reprovado. Motivo: ${motivo}`,
+                tipo: TipoAviso.COBRANCA
+            }
         });
 
         return { message: "Pagamento reprovado." };

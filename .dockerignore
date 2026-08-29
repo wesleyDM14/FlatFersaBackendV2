@@ -1,0 +1,11 @@
+node_modules
+dist
+tmp
+.env
+.env.*
+.git
+*.log
+npm-debug.log*
+yarn-error.log*
+deploy
+seed.ts

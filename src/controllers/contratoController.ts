@@ -32,6 +32,108 @@ class ContratoController {
         }
     }
 
+    async criarContratoDireto(req: Request, res: Response) {
+        try {
+            if (req.user.role !== 'ADMIN') {
+                return res.status(403).json({ message: 'Apenas administradores podem criar contratos diretamente.' });
+            }
+
+            const { clienteId, apartamentoId, dataInicio, duracaoMeses, diaVencimento, valorAluguel, leituraInicial, limiteKwhIsento } = req.body;
+
+            if (!clienteId || !apartamentoId || !dataInicio || !duracaoMeses || !diaVencimento || valorAluguel === undefined || leituraInicial === undefined) {
+                return res.status(400).json({ message: 'Dados incompletos. Informe cliente, apartamento, data de início, duração, dia de vencimento, valor do aluguel e leitura inicial.' });
+            }
+
+            const contrato = await contratoService.criarContratoDireto({
+                clienteId,
+                apartamentoId,
+                dataInicio,
+                duracaoMeses: Number(duracaoMeses),
+                diaVencimento: Number(diaVencimento),
+                valorAluguel: Number(valorAluguel),
+                leituraInicial: Number(leituraInicial),
+                limiteKwhIsento: Number(limiteKwhIsento || 0)
+            });
+
+            res.status(201).json(contrato);
+        } catch (error: any) {
+            res.status(500).json({ message: error.message });
+        }
+    }
+
+    async editarContrato(req: Request, res: Response) {
+        try {
+            if (req.user.role !== 'ADMIN') {
+                return res.status(403).json({ message: 'Apenas administradores podem editar contratos.' });
+            }
+
+            const { contratoId } = req.params;
+            const { valorAluguel, diaVencimento, limiteKwhIsento, duracaoMeses } = req.body;
+
+            const resultado = await contratoService.editarContrato(contratoId, {
+                valorAluguel: valorAluguel !== undefined ? Number(valorAluguel) : undefined,
+                diaVencimento: diaVencimento !== undefined ? Number(diaVencimento) : undefined,
+                limiteKwhIsento: limiteKwhIsento !== undefined ? Number(limiteKwhIsento) : undefined,
+                duracaoMeses: duracaoMeses !== undefined ? Number(duracaoMeses) : undefined
+            });
+
+            res.status(200).json(resultado);
+        } catch (error: any) {
+            res.status(500).json({ message: error.message });
+        }
+    }
+
+    async renovarContrato(req: Request, res: Response) {
+        try {
+            if (req.user.role !== 'ADMIN') {
+                return res.status(403).json({ message: 'Apenas administradores podem renovar contratos.' });
+            }
+
+            const { contratoId } = req.params;
+            const { duracaoMeses, valorAluguel, diaVencimento, limiteKwhIsento } = req.body;
+
+            if (!duracaoMeses) {
+                return res.status(400).json({ message: 'Informe a duração da renovação em meses.' });
+            }
+
+            const novoContrato = await contratoService.renovarContrato(contratoId, Number(duracaoMeses), {
+                valorAluguel: valorAluguel !== undefined ? Number(valorAluguel) : undefined,
+                diaVencimento: diaVencimento !== undefined ? Number(diaVencimento) : undefined,
+                limiteKwhIsento: limiteKwhIsento !== undefined ? Number(limiteKwhIsento) : undefined
+            });
+
+            res.status(201).json(novoContrato);
+        } catch (error: any) {
+            res.status(500).json({ message: error.message });
+        }
+    }
+
+    async transferirApartamento(req: Request, res: Response) {
+        try {
+            if (req.user.role !== 'ADMIN') {
+                return res.status(403).json({ message: 'Apenas administradores podem transferir apartamentos.' });
+            }
+
+            const { contratoId } = req.params;
+            const { novoApartamentoId, leituraInicial, valorAluguel } = req.body;
+
+            if (!novoApartamentoId || leituraInicial === undefined) {
+                return res.status(400).json({ message: 'Informe o novo apartamento e a leitura inicial do medidor.' });
+            }
+
+            const novoContrato = await contratoService.transferirApartamento(
+                contratoId,
+                novoApartamentoId,
+                Number(leituraInicial),
+                { valorAluguel: valorAluguel !== undefined ? Number(valorAluguel) : undefined }
+            );
+
+            res.status(201).json(novoContrato);
+        } catch (error: any) {
+            res.status(500).json({ message: error.message });
+        }
+    }
+
     async configurarContrato(req: Request, res: Response) {
         try {
             if (req.user.role !== 'ADMIN') {

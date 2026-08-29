@@ -109,6 +109,10 @@ model Contrato {
   cliente   Cliente @relation(fields: [clienteId], references: [id])
 
   faturas Fatura[]
+
+  contratoAnteriorId String?
+  contratoAnterior   Contrato?  @relation("ContratoHistorico", fields: [contratoAnteriorId], references: [id])
+  renovacoes         Contrato[] @relation("ContratoHistorico")
 }
 
 model Fatura {
@@ -187,6 +191,8 @@ enum StatusContrato {
   ENCERRADO
   CANCELADO
   DESPEJO
+  RENOVADO
+  TRANSFERIDO
 }
 
 enum StatusPagamento {

@@ -77,7 +77,14 @@ class ApartamentoService {
     async getApartamentoById(apartamentoId: string) {
         const apartamento = await prismaClient.apartamento.findUnique({
             where: { id: apartamentoId },
-            include: { predio: true }
+            include: {
+                predio: true,
+                contratos: {
+                    where: { status: { in: ['ATIVO', 'AGUARDANDO_ASSINATURA'] } },
+                    include: { cliente: true },
+                    take: 1
+                }
+            }
         });
 
         if (!apartamento) throw new Error('Apartamento não encontrado.');
@@ -90,6 +97,15 @@ class ApartamentoService {
         const existingApartamento = await prismaClient.apartamento.findUnique({ where: { id: apartamentoId } });
 
         if (!existingApartamento) throw new Error('Apartamento não encontrado.');
+
+        if (data.status && data.status !== existingApartamento.status) {
+            const contratoAtivo = await prismaClient.contrato.findFirst({
+                where: { apartamentoId, status: { in: ['ATIVO', 'AGUARDANDO_ASSINATURA'] } }
+            });
+            if (contratoAtivo) {
+                throw new Error('Este apartamento possui um contrato ativo. Use as ações de renovar/transferir/cancelar contrato para alterar sua ocupação.');
+            }
+        }
 
         await prismaClient.apartamento.update({
             where: { id: apartamentoId },
