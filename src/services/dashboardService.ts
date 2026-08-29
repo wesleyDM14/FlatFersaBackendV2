@@ -91,22 +91,39 @@ class DashboardService {
 
         // 6. ALERTA DE CONTRATOS VENCENDO (Próximos 30 dias)
         // Busca contratos ativos e calcula se vence logo
-        const contratosDb = await prismaClient.contrato.findMany({
-            where: { status: StatusContrato.ATIVO },
-            include: { cliente: { select: { nome: true } }, apartamento: { select: { numero: true } } }
-        });
-
         const trintaDias = new Date();
         trintaDias.setDate(trintaDias.getDate() + 30);
 
-        const contratosVencendo = contratosDb
-            .filter(c => c.dataFim && c.dataFim > hoje && c.dataFim <= trintaDias)
-            .map(c => ({
-                id: c.id,
-                cliente: c.cliente.nome,
-                apartamento: c.apartamento.numero,
-                vencimento: c.dataFim
-            }));
+        // Faturas em aberto (pendentes que vencem nos próximos 30 dias) ou já atrasadas
+        const faturasEmAberto = await prismaClient.fatura.findMany({
+            where: {
+                OR: [
+                    { status: StatusPagamento.ATRASADO },
+                    { status: StatusPagamento.PENDENTE, dataVencimento: { lte: trintaDias } }
+                ]
+            },
+            orderBy: { dataVencimento: 'asc' },
+            take: 15,
+            include: {
+                contrato: {
+                    include: {
+                        cliente: { select: { nome: true } },
+                        apartamento: { select: { numero: true } }
+                    }
+                }
+            }
+        });
+
+        const faturasVencendo = faturasEmAberto.map(f => ({
+            id: f.id,
+            cliente: f.contrato.cliente.nome,
+            apartamento: f.contrato.apartamento.numero,
+            vencimento: f.dataVencimento,
+            valor: f.valorTotal,
+            status: f.status === StatusPagamento.PENDENTE && verificarAtraso(f.dataVencimento)
+                ? StatusPagamento.ATRASADO
+                : f.status
+        }));
 
 
         // RETORNO FINAL
@@ -128,7 +145,7 @@ class DashboardService {
                 }
             },
             alerts: {
-                contratosVencendo
+                faturasVencendo
             }
         };
     }
