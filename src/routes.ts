@@ -10,6 +10,7 @@ import ContratoController from './controllers/contratoController';
 import FaturaController from './controllers/faturaController';
 import AvisoController from './controllers/avisoController';
 import DashboardController from './controllers/dashboardController';
+import ChamadoManutencaoController from './controllers/chamadoManutencaoController';
 
 import { authenticateUser } from './middlewares/authMiddleware';
 
@@ -42,6 +43,7 @@ const contratoController = new ContratoController();
 const faturaController = new FaturaController();
 const avisoController = new AvisoController();
 const dashboardController = new DashboardController();
+const chamadoManutencaoController = new ChamadoManutencaoController();
 
 router.post('/login', AuthController.login);
 
@@ -151,6 +153,16 @@ router.post('/avisos/individual', avisoController.enviarAvisoIndividual.bind(avi
 router.get('/me/avisos', avisoController.getMeusAvisos.bind(avisoController));
 router.put('/avisos/:avisoId/lido', avisoController.marcarComoLido.bind(avisoController));
 router.delete('/avisos/:avisoId', avisoController.deleteAviso.bind(avisoController));
+
+// --- CHAMADOS DE MANUTENÇÃO ---
+router.post('/chamados',
+    upload.single('file') as any,
+    chamadoManutencaoController.criarChamado.bind(chamadoManutencaoController)
+);
+router.get('/chamados', chamadoManutencaoController.getChamados.bind(chamadoManutencaoController));
+router.get('/me/chamados', chamadoManutencaoController.getMeusChamados.bind(chamadoManutencaoController));
+router.get('/chamados/:chamadoId', chamadoManutencaoController.getChamadoById.bind(chamadoManutencaoController));
+router.put('/chamados/:chamadoId/status', chamadoManutencaoController.atualizarStatus.bind(chamadoManutencaoController));
 
 // --- DASHBOARD ---
 router.get('/dashboard/admin', dashboardController.getDashboardAdmin.bind(dashboardController));

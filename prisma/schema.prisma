@@ -43,6 +43,7 @@ model Cliente {
   user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   contratos Contrato[]
+  chamados  ChamadoManutencao[]
 }
 
 model Predio {
@@ -81,6 +82,7 @@ model Apartamento {
   predio   Predio @relation(fields: [predioId], references: [id], onDelete: Cascade)
 
   contratos Contrato[]
+  chamados  ChamadoManutencao[]
 }
 
 model Contrato {
@@ -154,6 +156,26 @@ model Fatura {
   contrato   Contrato @relation(fields: [contratoId], references: [id], onDelete: Cascade)
 }
 
+model ChamadoManutencao {
+  id            String            @id @default(uuid())
+  titulo        String
+  descricao     String            @db.Text
+  status        StatusChamado     @default(ABERTO)
+  prioridade    PrioridadeChamado @default(MEDIA)
+  fotoUrl       String?
+  respostaAdmin String?           @db.Text
+
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+  resolvidoEm DateTime?
+
+  apartamentoId String
+  apartamento   Apartamento @relation(fields: [apartamentoId], references: [id], onDelete: Cascade)
+
+  clienteId String
+  cliente   Cliente @relation(fields: [clienteId], references: [id], onDelete: Cascade)
+}
+
 model Avisos {
   id        String    @id @default(uuid())
   lido      Boolean   @default(false)
@@ -216,4 +238,17 @@ enum TipoAviso {
   COBRANCA
   MANUTENCAO
   SISTEMA
+}
+
+enum StatusChamado {
+  ABERTO
+  EM_ANDAMENTO
+  CONCLUIDO
+  CANCELADO
+}
+
+enum PrioridadeChamado {
+  BAIXA
+  MEDIA
+  ALTA
 }
