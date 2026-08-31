@@ -36,6 +36,10 @@ model Cliente {
   statusCadastro   StatusCadastro @default(PENDENTE_APROVACAO)
   motivoReprovacao String?
 
+  exclusaoSolicitada      Boolean   @default(false)
+  dataSolicitacaoExclusao DateTime?
+  motivoNegacaoExclusao   String?
+
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 

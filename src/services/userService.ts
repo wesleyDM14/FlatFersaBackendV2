@@ -88,7 +88,8 @@ class UserService {
             phone: user.cliente?.telefone || '',
             address: user.cliente?.enderecoAtual || '',
             status: user.cliente?.statusCadastro,
-            avatar: user.cliente?.fotoRostoUrl || null
+            avatar: user.cliente?.fotoRostoUrl || null,
+            exclusaoSolicitada: user.cliente?.exclusaoSolicitada || false
         };
     }
 

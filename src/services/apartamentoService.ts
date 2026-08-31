@@ -92,6 +92,32 @@ class ApartamentoService {
         return apartamento;
     }
 
+    async getHistoricoApartamento(apartamentoId: string) {
+        const apartamento = await prismaClient.apartamento.findUnique({ where: { id: apartamentoId } });
+        if (!apartamento) throw new Error('Apartamento não encontrado.');
+
+        const contratos = await prismaClient.contrato.findMany({
+            where: { apartamentoId },
+            orderBy: { dataInicio: 'desc' },
+            include: {
+                cliente: { select: { nome: true } },
+                faturas: {
+                    orderBy: { dataVencimento: 'asc' },
+                    select: {
+                        id: true,
+                        dataVencimento: true,
+                        leituraAnterior: true,
+                        leituraAtual: true,
+                        consumoTotal: true,
+                        status: true,
+                    }
+                }
+            }
+        });
+
+        return contratos;
+    }
+
     async updateApartamento(apartamentoId: string, data: { climatizado?: boolean, valorBase?: number, status?: StatusApartamento, numero?: string }) {
 
         const existingApartamento = await prismaClient.apartamento.findUnique({ where: { id: apartamentoId } });

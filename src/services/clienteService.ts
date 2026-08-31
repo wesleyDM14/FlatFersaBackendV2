@@ -227,6 +227,99 @@ class ClienteService {
         return;
     }
 
+    async solicitarExclusao(userId: string) {
+        const client = await prismaClient.cliente.findUnique({ where: { userId } });
+        if (!client) throw new Error('Perfil de cliente não encontrado.');
+
+        const contratoAtivo = await prismaClient.contrato.findFirst({
+            where: { clienteId: client.id, status: { in: ['ATIVO', 'AGUARDANDO_ASSINATURA', 'SOLICITADO'] } }
+        });
+        if (contratoAtivo) {
+            throw new Error('Não é possível excluir a conta enquanto houver um contrato ativo ou em andamento. Encerre o contrato primeiro.');
+        }
+
+        await prismaClient.cliente.update({
+            where: { id: client.id },
+            data: { exclusaoSolicitada: true, dataSolicitacaoExclusao: new Date(), motivoNegacaoExclusao: null }
+        });
+
+        const admins = await prismaClient.user.findMany({ where: { role: 'ADMIN' }, select: { id: true } });
+        if (admins.length > 0) {
+            await prismaClient.avisos.createMany({
+                data: admins.map(admin => ({
+                    userId: admin.id,
+                    titulo: 'Solicitação de Exclusão de Conta',
+                    conteudo: `${client.nome} solicitou a exclusão da sua conta e dados pessoais.`,
+                    tipo: 'SISTEMA' as const,
+                }))
+            });
+        }
+
+        return { message: 'Solicitação de exclusão registrada. Um administrador vai analisar seu pedido.' };
+    }
+
+    async aprovarExclusao(clientId: string) {
+        const client = await prismaClient.cliente.findUnique({ where: { id: clientId } });
+        if (!client) throw new Error('Cliente não encontrado.');
+        if (!client.exclusaoSolicitada) throw new Error('Este cliente não solicitou exclusão de conta.');
+
+        const contratoAtivo = await prismaClient.contrato.findFirst({
+            where: { clienteId: clientId, status: { in: ['ATIVO', 'AGUARDANDO_ASSINATURA', 'SOLICITADO'] } }
+        });
+        if (contratoAtivo) {
+            throw new Error('Não é possível excluir: o cliente passou a ter um contrato ativo desde a solicitação.');
+        }
+
+        // Anonimiza os dados pessoais em vez de apagar o registro: contratos e faturas
+        // ja emitidos precisam ser preservados por obrigacao fiscal/contabil, mas nao
+        // podem mais ficar associados a dados de identificacao direta do titular.
+        const anonId = client.id.slice(0, 8);
+        await prismaClient.cliente.update({
+            where: { id: clientId },
+            data: {
+                nome: `Cliente Excluído (${anonId})`,
+                cpf: `EXCLUIDO-${anonId}`,
+                rg: null,
+                dataNascimento: new Date(0),
+                telefone: 'EXCLUIDO',
+                enderecoAtual: null,
+                docFrenteUrl: null,
+                docVersoUrl: null,
+                fotoRostoUrl: null,
+                statusCadastro: 'BLOQUEADO',
+                exclusaoSolicitada: false,
+            }
+        });
+
+        await prismaClient.user.update({
+            where: { id: client.userId },
+            data: { email: `excluido-${anonId}@flatfersa.local`, password: await hash(`${Date.now()}${Math.random()}`, 10) }
+        });
+
+        return { message: 'Conta e dados pessoais anonimizados com sucesso.' };
+    }
+
+    async negarExclusao(clientId: string, motivo: string) {
+        const client = await prismaClient.cliente.findUnique({ where: { id: clientId } });
+        if (!client) throw new Error('Cliente não encontrado.');
+
+        await prismaClient.cliente.update({
+            where: { id: clientId },
+            data: { exclusaoSolicitada: false, motivoNegacaoExclusao: motivo }
+        });
+
+        await prismaClient.avisos.create({
+            data: {
+                userId: client.userId,
+                titulo: 'Solicitação de Exclusão Negada',
+                conteudo: motivo || 'Sua solicitação de exclusão de conta foi analisada e não pôde ser atendida no momento.',
+                tipo: 'SISTEMA',
+            }
+        });
+
+        return { message: 'Solicitação de exclusão negada.' };
+    }
+
     async getDocumentFrente(clientId: string) {
         const client = await prismaClient.cliente.findUnique({ where: { id: clientId } });
 

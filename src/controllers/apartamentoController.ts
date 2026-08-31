@@ -73,6 +73,23 @@ class ApartamentoController {
         }
     }
 
+    async getHistoricoApartamento(req: Request, res: Response) {
+        try {
+            if (req.user.role !== 'ADMIN') {
+                return res.status(403).json({ message: 'Acesso negado.' });
+            }
+
+            const apartamentoId = req.params.apartamentoId;
+            if (!apartamentoId) return res.status(400).json({ message: 'ID não fornecido.' });
+
+            const historico = await apartamentoService.getHistoricoApartamento(apartamentoId);
+            return res.json(historico);
+        } catch (error: any) {
+            console.error(error);
+            res.status(500).json({ message: error.message });
+        }
+    }
+
     async updateApartamento(req: Request, res: Response) {
         try {
             if (req.user.role !== 'ADMIN') {

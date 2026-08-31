@@ -117,6 +117,40 @@ class ClienteController {
         }
     }
 
+    async solicitarExclusao(req: Request, res: Response) {
+        try {
+            const result = await clienteService.solicitarExclusao(req.user.id);
+            res.json(result);
+        } catch (error: any) {
+            res.status(400).json({ message: error.message });
+        }
+    }
+
+    async aprovarExclusao(req: Request, res: Response) {
+        try {
+            if (req.user.role !== 'ADMIN') return res.status(403).json({ message: 'Acesso negado.' });
+
+            const clientId = req.params.clientId;
+            const result = await clienteService.aprovarExclusao(clientId);
+            res.json(result);
+        } catch (error: any) {
+            res.status(400).json({ message: error.message });
+        }
+    }
+
+    async negarExclusao(req: Request, res: Response) {
+        try {
+            if (req.user.role !== 'ADMIN') return res.status(403).json({ message: 'Acesso negado.' });
+
+            const clientId = req.params.clientId;
+            const { motivo } = req.body;
+            const result = await clienteService.negarExclusao(clientId, motivo);
+            res.json(result);
+        } catch (error: any) {
+            res.status(400).json({ message: error.message });
+        }
+    }
+
     async getDocumentoFrente(req: Request, res: Response) {
         try {
             const clientId = req.params.clientId;

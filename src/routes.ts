@@ -92,6 +92,11 @@ router.post('/clients',
 router.get('/clients/:clientId/doc-frente', clienteController.getDocumentoFrente.bind(clienteController));
 router.get('/clients/:clientId/doc-verso', clienteController.getDocumentoVerso.bind(clienteController));
 
+// --- EXCLUSÃO DE CONTA (LGPD) ---
+router.post('/me/solicitar-exclusao', clienteController.solicitarExclusao.bind(clienteController));
+router.post('/clients/:clientId/aprovar-exclusao', clienteController.aprovarExclusao.bind(clienteController));
+router.post('/clients/:clientId/negar-exclusao', clienteController.negarExclusao.bind(clienteController));
+
 // --- PRÉDIOS ---
 router.post('/predios', predioController.createPredio.bind(predioController));
 router.get('/predios', predioController.getPredios.bind(predioController));
@@ -103,6 +108,7 @@ router.delete('/predios/:predioId', predioController.deletePredio.bind(predioCon
 router.post('/apartamentos', apartamentoController.createApartamento.bind(apartamentoController));
 router.get('/apartamentos', apartamentoController.getApartamentos.bind(apartamentoController));
 router.get('/apartamentos/:apartamentoId', apartamentoController.getApartamentoById.bind(apartamentoController));
+router.get('/apartamentos/:apartamentoId/historico', apartamentoController.getHistoricoApartamento.bind(apartamentoController));
 router.get('/predios/:predioId/apartamentos', apartamentoController.getApartamentosByPredioId.bind(apartamentoController));
 router.put('/apartamentos/:apartamentoId', apartamentoController.updateApartamento.bind(apartamentoController));
 router.delete('/apartamentos/:apartamentoId', apartamentoController.deleteApartamento.bind(apartamentoController));
